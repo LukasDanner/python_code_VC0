@@ -22,6 +22,8 @@ from helpers_classical import plot_phasespace_classical
 from helpers_classical import fourier_transform
 from helpers_classical import inverse_fourier_transform
 from helpers_classical import current_VCO
+from helpers_classical import current_L
+
 
 from scipy.signal import find_peaks
 
@@ -163,6 +165,7 @@ for N_now in range(param_obj.N_runs):
 
     # current of the VCO
     I_d = current_VCO(propagator.res[:, 0], circuit.n)
+    I_L = current_L(propagator.res[:, 0], times[1] - times[0], circuit.alpha_od, circuit.Qcoil)
 
     # FT of the current 
     wvec, I_d_FT = fourier_transform(times[i_st:] - times[i_st], I_d[i_st:]) 

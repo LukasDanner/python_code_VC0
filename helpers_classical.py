@@ -29,6 +29,13 @@ def current_VCO(voltage, n):
 
     return - voltage + voltage**3 / (4 * n)**2
 
+def current_L(voltage, dt, alpha_od, Q):
+
+    F = np.zeros_like(voltage)
+    F[1:] = np.cumsum((voltage[1:] + voltage[:-1]) / 2) * dt * Q / 2 / alpha_od
+
+    return F
+
 
 def lookup_in_dict(dict_, key, default=None):
     '''
