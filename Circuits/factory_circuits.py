@@ -1,5 +1,6 @@
 # all circuits
 from Circuits.circuit_VCO import Circuit_VCO
+from Circuits.circuit_VCOclSp import Circuit_VCOclSp
 
 from helpers_classical import lookup_in_dict
 
@@ -10,6 +11,10 @@ def factory_circuits(**params):
     if name == 'VCO':
 
         obj = Circuit_VCO(**params)
+
+    elif name == "VCOclSp":
+
+        obj = Circuit_VCOclSp(**params)
 
     else:
 

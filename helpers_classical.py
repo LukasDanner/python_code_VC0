@@ -661,7 +661,146 @@ def plot_phasespace_classical(alpha, xlim=None, ylim=None,
     # close the plot
     plt.close()
 
+def plot_trajectory3d(x, y, z,
+                      xlabel='Sx', ylabel='Sy', zlabel='Sz',
+                      title=None,
+                      fname=None,
+                      elev=25, azim=45,
+                      sphere=True,
+                      equal_axes=True):
+    '''
+    quick 3D plot of a trajectory (eg: spin precession)
 
+    input:
+        x           array specifying x-component versus time
+        y           array specifying y-component versus time
+        z           array specifying z-component versus time
+
+        xlabel      label for x-axis
+        ylabel      label for y-axis
+        zlabel      label for z-axis
+
+        title       plot title
+
+        fname       filename as full path
+
+        elev        elevation angle for 3D view
+        azim        azimuth angle for 3D view
+
+        sphere      bool, if True plot sphere with radius
+                    equal to magnitude of initial vector
+
+        equal_axes  bool, if True use equal scaling on all axes
+    '''
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    from mpl_toolkits.mplot3d import Axes3D
+
+    # create figure
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # plot trajectory
+    ax.plot(x, y, z, linewidth=2)
+
+    # mark initial point
+    ax.scatter(x[0], y[0], z[0],
+               color='green',
+               s=60,
+               label='initial')
+
+    # mark final point
+    ax.scatter(x[-1], y[-1], z[-1],
+               color='red',
+               s=60,
+               label='final')
+
+    # sphere with radius of initial vector
+    if sphere:
+
+        # radius from initial values
+        r = np.sqrt(x[0]**2 + y[0]**2 + z[0]**2)
+
+        # spherical coordinates
+        u = np.linspace(0, 2*np.pi, 100)
+        v = np.linspace(0, np.pi, 100)
+
+        # sphere surface
+        xs = r * np.outer(np.cos(u), np.sin(v))
+        ys = r * np.outer(np.sin(u), np.sin(v))
+        zs = r * np.outer(np.ones(np.size(u)), np.cos(v))
+
+        # plot sphere
+        ax.plot_surface(xs, ys, zs,
+                        color='lightblue',
+                        alpha=0.15,
+                        linewidth=0)
+
+    # determine symmetric axis limits around origin
+    maxval = np.max(np.abs(np.concatenate([x, y, z])))
+
+    ax.set_xlim([-maxval, maxval])
+    ax.set_ylim([-maxval, maxval])
+    ax.set_zlim([-maxval, maxval])
+
+    # draw coordinate axes through origin
+    ax.plot([-maxval, maxval], [0, 0], [0, 0],
+            color='black', linewidth=1)
+
+    ax.plot([0, 0], [-maxval, maxval], [0, 0],
+            color='black', linewidth=1)
+
+    ax.plot([0, 0], [0, 0], [-maxval, maxval],
+            color='black', linewidth=1)
+    
+    # set labels
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_zlabel(zlabel)
+
+    # set title
+    if title is not None:
+        ax.set_title(title)
+
+    # equal axis scaling
+    if equal_axes:
+
+        max_range = np.array([
+            x.max() - x.min(),
+            y.max() - y.min(),
+            z.max() - z.min()
+        ]).max() / 2.0
+
+        mid_x = (x.max() + x.min()) * 0.5
+        mid_y = (y.max() + y.min()) * 0.5
+        mid_z = (z.max() + z.min()) * 0.5
+
+        ax.set_xlim(mid_x - max_range, mid_x + max_range)
+        ax.set_ylim(mid_y - max_range, mid_y + max_range)
+        ax.set_zlim(mid_z - max_range, mid_z + max_range)
+
+    # set viewing angle
+    ax.view_init(elev=elev, azim=azim)
+
+    # legend
+    ax.legend()
+
+    # handle case where no file name is given
+    if fname is None:
+
+        global fig_tmp_count
+        plt.savefig(fig_tmp_name + str(fig_tmp_count) + '.pdf')
+        fig_tmp_count += 1
+
+    else:
+
+        # save figure
+        plt.savefig(fname)
+
+    # close plot
+    plt.close()
 
 def fourier_transform(tvec, func, norm="forward"):
 

@@ -22,11 +22,12 @@ from helpers_classical import plot_phasespace_classical
 from helpers_classical import fourier_transform
 from helpers_classical import inverse_fourier_transform
 from helpers_classical import current_VCO
+from helpers_classical import plot_trajectory3d
 
 from scipy.signal import find_peaks
 
 # config-file (as arrays, if we want to switch between ini-files quickly)
-config_filenames = ['configfile_VCO.ini']
+config_filenames = ['configfile_VCO_clSp.ini']
 
 #relative path of root folder
 output_path = '../Output/'
@@ -88,7 +89,7 @@ for N_now in range(param_obj.N_runs):
     # propagate
     if param_obj.params_now_flat["load_sol"]:
 
-        propagator.res = np.load(logging.subdir + "\\res.npy")
+        propagator.res = np.load(logging.subdir + "/res.npy")
 
     else:
 
@@ -98,6 +99,7 @@ for N_now in range(param_obj.N_runs):
 
             np.save(logging.subdir + "/res", propagator.res)
 
+    print(propagator.res)
 
     peaks, _ = find_peaks(propagator.res[i_st:, 0])
     A_osc = np.mean((propagator.res[i_st:,0])[peaks])
@@ -123,6 +125,7 @@ for N_now in range(param_obj.N_runs):
     i_osc = i_f0 + np.argmax(np.abs(res_ft[i_f0:, 0])**2)
     w_osc = wvec[i_osc]
 
+
     A_osc0 = 4 * np.sqrt(2/3) * np.sqrt(1 - 1/circuit.alpha_od) 
     w_osc0 = 1 - (circuit.alpha_od-1)**2 / 16 / circuit.Qcoil**2
     print("steady-state oscillation amplitude and frequency: ", A_osc, w_osc)
@@ -139,14 +142,14 @@ for N_now in range(param_obj.N_runs):
     # plots in time space
 
     # full result
-    plot_N_in_1(times, np.transpose(propagator.res),
+    plot_N_in_1(times, np.transpose(propagator.res[:, :2]),
                 xlabel='time ' + r"$\tau =  t \omega_0$", ylabel='',
                 legend=[r"$y(\tau)$", r"$\dot{y}(\tau)$"],
                 fname=logging.subdir + "/res_t.pdf",
                 vline=[t_st])
 
     # zoomed result
-    plot_N_in_1(times[i_z0:i_zf], np.transpose(propagator.res[i_z0:i_zf, :]),
+    plot_N_in_1(times[i_z0:i_zf], np.transpose(propagator.res[i_z0:i_zf, :2]),
                 xlabel='time ' + r"$ t \omega_0$", ylabel='',
                 legend=[r"$y(\tau)$", r"$\dot{y}(\tau)$"],
                 fname=logging.subdir + "/res_t_zoom.pdf")
@@ -180,3 +183,20 @@ for N_now in range(param_obj.N_runs):
             xlim=[w_z0, w_zf],
             fname=logging.subdir + "/current_w.pdf",
             vline=[circuit.w0]) 
+    
+    Mxy = propagator.res[:, 2] + 1.0j * propagator.res[:, 3]
+    Mxy_rot = Mxy * np.exp(1.0j * times * w_osc)
+
+
+    # plot spin motion
+    plot_trajectory3d(np.real(Mxy_rot), np.imag(Mxy_rot), propagator.res[:, 4],
+                      xlabel=r'$M_x/M_0$', ylabel=r'$M_y/M_0$', zlabel=r'$M_z/M_0$',
+                      title="in rotating frame",
+                      fname=logging.subdir + "/spin_traj_rot.pdf",
+                      elev=15, azim=-75,
+                      sphere=True,
+                      equal_axes=True)
+    
+    plot_phasespace_classical([Mxy_rot, Mxy_rot[i_st:]],
+                            legend=["full evolution", "steady state"],
+                            fname=logging.subdir + "/Mxy_rot.pdf")
