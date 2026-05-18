@@ -85,11 +85,18 @@ class Circuit_VCOclSp:
 
             # spin dof 
             res[2] = - y[2] / self.T2 + self.wL * y[3]
-            res[3] = - y[3] / self.T2 - self.wL * y[2] + y[4] * self.r_eff * y[5]
+
+            # coupling with vco
+            #res[3] = - y[3] / self.T2 - self.wL * y[2] + y[4] * self.r_eff * y[5]
+            
+            # test line for sin-B field
+            res[3] = - y[3] / self.T2 - self.wL * y[2] + y[4] * self.r_eff * np.cos(self.w0 *t)
+
+
             res[4] = - (y[4]-1.0) / self.T1 - y[3] * self.r_eff * y[5]
 
             # coil current
-            res[5] = self.Qcoil /(2 * self.alpha_od) * res[0]
+            res[5] = self.Qcoil /(2 * self.alpha_od) * y[0]
 
             return res
 

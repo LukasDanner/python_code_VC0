@@ -17,12 +17,15 @@ from factory_timegrid import factory_timegrid
 from Circuits.factory_circuits import factory_circuits
 
 from helpers_classical import plot_N_in_1
+from helpers_classical import plot_N_in_1_diff_xaxis
 from helpers_classical import write_parameters_run
 from helpers_classical import plot_phasespace_classical
 from helpers_classical import fourier_transform
 from helpers_classical import inverse_fourier_transform
 from helpers_classical import current_VCO
 from helpers_classical import plot_trajectory3d
+from helpers_classical import plot_ReIm
+
 
 from scipy.signal import find_peaks
 
@@ -131,6 +134,39 @@ for N_now in range(param_obj.N_runs):
     print("steady-state oscillation amplitude and frequency: ", A_osc, w_osc)
     print("approx. oscillation amplitude and freq. from paper", A_osc0, w_osc0)
 
+    Mx = propagator.res[:, 2]
+    wvec, Mx_FT = fourier_transform(times[i_st:] - times[i_st], Mx[i_st:])
+
+    i_spinosc = i_f0 + np.argmax(np.abs(Mx_FT[i_f0:])**2)
+    w_spinosc = wvec[i_spinosc] 
+
+    print(2 * np.pi / (w_osc-1.0), w_osc, w_spinosc)
+
+
+    Mxy = propagator.res[:, 2] + 1.0j * propagator.res[:, 3]
+    Mxy_rot = Mxy * np.exp(1.0j * times * w_spinosc)
+
+    plot_N_in_1(wvec, [np.log10(np.abs(Mx_FT)**2)],
+                xlim=[-0.5, 2.0],
+                fname=logging.subdir + "/Mx_FT.pdf")
+
+    Bcoil = circuit.r_eff * propagator.res[:, 5]
+    wvec, Bcoil_FT = fourier_transform(times[i_st:] - times[i_st], Bcoil[i_st:]) 
+
+    plot_ReIm(times[i_z0:i_zf], Mxy[i_z0:i_zf],
+              fname=logging.subdir + "/Mxy_zoom.pdf")
+
+    plot_ReIm(times, Mxy_rot,
+              fname=logging.subdir + "/Mxy_rot_ReIm.pdf")
+
+    plot_N_in_1(times, [Bcoil],
+                fname=logging.subdir + "/Bcoil.pdf")
+
+    plot_N_in_1(wvec, [np.log10(np.abs(Bcoil_FT)**2)],
+                xlim=[-3.2, 6.2],
+                fname=logging.subdir + "/Bcoil_FT.pdf")
+    
+
     # plots in Fourier space
     plot_N_in_1(wvec, [np.log10(np.abs(res_ft[:, 0])**2)],
             xlabel='frequency ' + r"$\omega / \omega_0$", ylabel='',
@@ -184,19 +220,22 @@ for N_now in range(param_obj.N_runs):
             fname=logging.subdir + "/current_w.pdf",
             vline=[circuit.w0]) 
     
-    Mxy = propagator.res[:, 2] + 1.0j * propagator.res[:, 3]
-    Mxy_rot = Mxy * np.exp(1.0j * times * w_osc)
-
 
     # plot spin motion
+    '''
     plot_trajectory3d(np.real(Mxy_rot), np.imag(Mxy_rot), propagator.res[:, 4],
                       xlabel=r'$M_x/M_0$', ylabel=r'$M_y/M_0$', zlabel=r'$M_z/M_0$',
                       title="in rotating frame",
                       fname=logging.subdir + "/spin_traj_rot.pdf",
                       elev=15, azim=-75,
                       sphere=True,
-                      equal_axes=True)
-    
+                      equal_axes=False)
+
     plot_phasespace_classical([Mxy_rot, Mxy_rot[i_st:]],
                             legend=["full evolution", "steady state"],
+                            xlabel=r"$M_{x,rot}(\tau)$", 
+                            ylabel=r"$M_{y,rot}(\tau)$",
                             fname=logging.subdir + "/Mxy_rot.pdf")
+    '''
+
+

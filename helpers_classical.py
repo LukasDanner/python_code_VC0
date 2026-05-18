@@ -741,6 +741,8 @@ def plot_trajectory3d(x, y, z,
     # determine symmetric axis limits around origin
     maxval = np.max(np.abs(np.concatenate([x, y, z])))
 
+    #print(maxval)
+
     ax.set_xlim([-maxval, maxval])
     ax.set_ylim([-maxval, maxval])
     ax.set_zlim([-maxval, maxval])
