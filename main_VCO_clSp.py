@@ -89,13 +89,16 @@ for N_now in range(param_obj.N_runs):
                                      include_noise=circuit.include_noise,
                                      **param_obj.params_now_flat)
 
+    pathLoad = logging.subdir + "/res.npy"
+
     # propagate
-    if param_obj.params_now_flat["load_sol"]:
+    if param_obj.params_now_flat["load_sol"] and pathLoad.exists():
+
 
         propagator.res = np.load(logging.subdir + "/res.npy")
 
     else:
-
+        print("either ")
         propagator.propagate()
 
         if param_obj.params_now_flat["store_sol"]:

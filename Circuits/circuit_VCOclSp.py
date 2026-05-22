@@ -87,10 +87,10 @@ class Circuit_VCOclSp:
             res[2] = - y[2] / self.T2 + self.wL * y[3]
 
             # coupling with vco
-            #res[3] = - y[3] / self.T2 - self.wL * y[2] + y[4] * self.r_eff * y[5]
+            res[3] = - y[3] / self.T2 - self.wL * y[2] + y[4] * self.r_eff * y[5]
             
-            # test line for sin-B field
-            res[3] = - y[3] / self.T2 - self.wL * y[2] + y[4] * self.r_eff * np.cos(self.w0 *t)
+            # test line for cos-B field
+            #res[3] = - y[3] / self.T2 - self.wL * y[2] + y[4] * self.r_eff * np.cos(self.w0 *t)
 
 
             res[4] = - (y[4]-1.0) / self.T1 - y[3] * self.r_eff * y[5]
