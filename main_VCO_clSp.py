@@ -92,7 +92,7 @@ for N_now in range(param_obj.N_runs):
     pathLoad = logging.subdir + "/res.npy"
 
     # propagate
-    if param_obj.params_now_flat["load_sol"] and pathLoad.exists():
+    if param_obj.params_now_flat["load_sol"]: # and pathLoad.exists():
 
 
         propagator.res = np.load(logging.subdir + "/res.npy")
@@ -147,7 +147,7 @@ for N_now in range(param_obj.N_runs):
 
 
     Mxy = propagator.res[:, 2] + 1.0j * propagator.res[:, 3]
-    Mxy_rot = Mxy * np.exp(1.0j * times * w_spinosc)
+    Mxy_rot = Mxy * np.exp(1.0j * times * w_osc)
 
     plot_N_in_1(wvec, [np.log10(np.abs(Mx_FT)**2)],
                 xlim=[-0.5, 2.0],
