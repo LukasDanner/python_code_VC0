@@ -88,12 +88,11 @@ class Circuit_VCOclSp:
 
             # coupling with vco
             res[3] = - y[3] / self.T2 - self.wL * y[2] + y[4] * self.r_eff * y[5]
-            
+            res[4] = - (y[4]-1.0) / self.T1 - y[3] * self.r_eff * y[5]
+
             # test line for cos-B field
             #res[3] = - y[3] / self.T2 - self.wL * y[2] + y[4] * self.r_eff * np.cos(self.w0 *t)
-
-
-            res[4] = - (y[4]-1.0) / self.T1 - y[3] * self.r_eff * y[5]
+            #res[4] = - (y[4]-1.0) / self.T1 - y[3] * self.r_eff * np.cos(self.w0 *t)
 
             # coil current
             res[5] = self.Qcoil /(2 * self.alpha_od) * y[0]

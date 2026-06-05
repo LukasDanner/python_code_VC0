@@ -591,15 +591,21 @@ def plot_phasespace_classical(alpha, xlim=None, ylim=None,
     # open the plot
     fig, ax = plt.subplots()
 
+
+    alpha_max = 1.05 * np.max(np.abs(np.concatenate(alpha)))
+    
+
     if xlim is None:
 
-        xmax = np.max(np.abs(np.real(np.concatenate(alpha))))
-        xlim = [-xmax, xmax]
+        #xmax = np.max(np.abs(np.real(np.concatenate(alpha))))
+        #xlim = [-xmax, xmax]
+        xlim = [-alpha_max, alpha_max]
 
     if ylim is None:
 
-        pmax = np.max(np.abs(np.imag(np.concatenate(alpha))))
-        ylim = [-pmax, pmax]
+        #pmax = np.max(np.abs(np.imag(np.concatenate(alpha))))
+        #ylim = [-pmax, pmax]
+        ylim = [-alpha_max, alpha_max]
 
     # if no legends are given, make None-array
     if legend is None:
@@ -640,7 +646,7 @@ def plot_phasespace_classical(alpha, xlim=None, ylim=None,
     for ll in range(N_traj):
 
         plt.plot(np.real(alpha[ll]), np.imag(alpha[ll]), '--',  
-                linewidth=0.02, 
+                linewidth=0.1, 
                 # markersize=0.2, marker=".", 
                 label=legend[ll])
         

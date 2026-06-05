@@ -69,17 +69,18 @@ for N_now in range(param_obj.N_runs):
     vary_val = param_obj.params_now_flat[vary_name]
 
     # --- time grid
+    fac_stroboscopic = 2 * np.pi if param_obj.params_now_flat["t_st"] else 1.0
     times = factory_timegrid(**param_obj.params_now_flat)
     
     # steady state times
-    t_st = param_obj.params_now_flat["t_st"]
+    t_st = param_obj.params_now_flat["t_st"] * fac_stroboscopic
     i_st = np.where(times >= t_st)[0][0]  
 
     # zoom times
-    t_z0 = param_obj.params_now_flat["t_z0"]
-    t_zf = param_obj.params_now_flat["t_zf"]
+    t_z0 = param_obj.params_now_flat["t_z0"] * fac_stroboscopic
+    t_zf = param_obj.params_now_flat["t_zf"] * fac_stroboscopic
     i_z0 = np.where(times >= t_z0)[0][0]  
-    i_zf = np.where(times >= t_zf)[0][0]  
+    i_zf = np.where(times >= t_zf)[0][0] + 1
 
     # --- circuit
     circuit = factory_circuits(**param_obj.params_now_flat)
@@ -92,85 +93,172 @@ for N_now in range(param_obj.N_runs):
     pathLoad = logging.subdir + "/res.npy"
 
     # propagate
-    if param_obj.params_now_flat["load_sol"]: # and pathLoad.exists():
+    if param_obj.params_now_flat["load_sol"] and os.path.exists(pathLoad):
+        print("loading solution ")
 
 
         propagator.res = np.load(logging.subdir + "/res.npy")
 
     else:
-        print("either ")
+        print("propagating ")
         propagator.propagate()
 
         if param_obj.params_now_flat["store_sol"]:
 
             np.save(logging.subdir + "/res", propagator.res)
 
-    print(propagator.res)
+    # complex variable y, y' in phase-space 
+    alpha =  propagator.res[:, 0] + 1.0j*propagator.res[:, 1]
 
-    peaks, _ = find_peaks(propagator.res[i_st:, 0])
-    A_osc = np.mean((propagator.res[i_st:,0])[peaks])
+    # definition of complex magnetization
+    Mxy = propagator.res[:, 2] + 1.0j*propagator.res[:, 3]
+
+    # current of the VCO
+    I_d = current_VCO(propagator.res[:, 0], circuit.n)
+
+    # peak_indices of y
+    peak_indices_y, _ = find_peaks(propagator.res[i_st:, 0])
+
+    # peak_indices of y
+    peak_indices_Mx, _ = find_peaks(propagator.res[i_st:, 0])
+
+    # oscillation amplitude: mean of all peaks
+    A_osc = np.mean((propagator.res[i_st:,0])[peak_indices_y])
+
 
     # --- Fourier transform of steady state
-    res_ft = np.empty_like(propagator.res[i_st:, :])
+    #res_ft = np.empty_like(propagator.res[i_st:, :])
+    res_ft = np.empty([len(times[i_st:]), len(propagator.res[0])], dtype=np.complex_)
+
     for ll in range(len(propagator.res[0])):
         wvec, res_ft[:, ll] = fourier_transform(times[i_st:] - times[i_st], propagator.res[i_st:, ll]) 
- 
+
+    # FT of the current 
+    wvec, I_d_FT = fourier_transform(times[i_st:] - times[i_st], I_d[i_st:]) 
+
+    #Mx = propagator.res[:, 2]
+    #wvec, Mx_FT = fourier_transform(times[i_st:] - times[i_st], Mx[i_st:])
+
+    #Bcoil = circuit.r_eff * propagator.res[:, 5]
+    #wvec, Bcoil_FT = fourier_transform(times[i_st:] - times[i_st], Bcoil[i_st:]) 
+
     # frequencies used for zooming
     w_z0 = param_obj.params_now_flat["w_z0"]
     w_zf = param_obj.params_now_flat["w_zf"]
     i_fz0 = np.where(wvec >= w_z0)[0][0]  
-    i_fzf = np.where(wvec >= w_zf)[0][0]  
+    i_fzf = np.where(wvec >= w_zf)[0][0] 
 
-    # index for frequency w= 0
+    # index for frequency w=0
     i_f0 = np.where(wvec >= 0.0)[0][0]  
 
-    # index for frequency w= w0
+    # index for frequency w=w0
     i_fw0 = np.where(wvec >= circuit.w0)[0][0]  
 
-    # main steady-state oscillation frequency
+    # index of main oscillation frequency of y
     i_osc = i_f0 + np.argmax(np.abs(res_ft[i_f0:, 0])**2)
-    w_osc = wvec[i_osc]
 
+    # index of main oscillation frequency of Mx
+    i_spinosc = i_f0 + np.argmax(np.abs(res_ft[i_f0:, 2])**2)
 
+    # main steady-state oscillation frequency
+    # estimates by FT, estimates by difference between oscillation peaks, ...
+    w_osc = [wvec[i_osc], 2 * np.pi / (times[peak_indices_y[-1]] - times[peak_indices_y[-2]])]
+
+    # paper values 
     A_osc0 = 4 * np.sqrt(2/3) * np.sqrt(1 - 1/circuit.alpha_od) 
     w_osc0 = 1 - (circuit.alpha_od-1)**2 / 16 / circuit.Qcoil**2
     print("steady-state oscillation amplitude and frequency: ", A_osc, w_osc)
     print("approx. oscillation amplitude and freq. from paper", A_osc0, w_osc0)
 
-    Mx = propagator.res[:, 2]
-    wvec, Mx_FT = fourier_transform(times[i_st:] - times[i_st], Mx[i_st:])
+    w_spinosc = [wvec[i_spinosc], 2 * np.pi / (times[peak_indices_Mx[-1]] - times[peak_indices_Mx[-2]])] 
 
-    i_spinosc = i_f0 + np.argmax(np.abs(Mx_FT[i_f0:])**2)
-    w_spinosc = wvec[i_spinosc] 
+    #print(2 * np.pi / (w_osc[0]-1.0),2 * np.pi / (w_osc[1]-1.0))
+    print(w_osc, w_spinosc)
 
-    print(2 * np.pi / (w_osc-1.0), w_osc, w_spinosc)
+    # --- rot-frame trafo
+    
+    # start with some good estimate of rotation freq.
+    w_rot = w_osc[0]
 
+    # calculate difference between first and last steady-state rotating-frame phase-space point 
+    alpha_1 = alpha[i_st]  * np.exp(1.0j * w_rot * times[i_st])
+    alpha_2 = alpha[-1]   * np.exp(1.0j * w_rot * times[-1])
 
-    Mxy = propagator.res[:, 2] + 1.0j * propagator.res[:, 3]
-    Mxy_rot = Mxy * np.exp(1.0j * times * w_osc)
+    w_rot -= np.angle(alpha_2 / alpha_1) / (times[-1]-times[i_st])
 
-    plot_N_in_1(wvec, [np.log10(np.abs(Mx_FT)**2)],
-                xlim=[-0.5, 2.0],
-                fname=logging.subdir + "/Mx_FT.pdf")
+    alpha_rot = alpha  * np.exp(1.0j * w_rot * times)
+    Mxy_rot = Mxy * np.exp(1.0j * times * w_rot)
 
-    Bcoil = circuit.r_eff * propagator.res[:, 5]
-    wvec, Bcoil_FT = fourier_transform(times[i_st:] - times[i_st], Bcoil[i_st:]) 
+    w_osc += [w_rot]
+    print(w_osc)
 
+    # --- Plots in time space 
+
+    # full result of y and y'
+    plot_N_in_1(times, np.transpose(propagator.res[:, :2]),
+                xlabel='time ' + r"$\tau =  t \omega_0$", ylabel='',
+                legend=[r"$y(\tau)$", r"$\dot{y}(\tau)$"],
+                fname=logging.subdir + "/res_t.pdf",
+                vline=[t_st])
+
+    # zoomed result of y and y'
+    plot_N_in_1(times[i_z0:i_zf], np.transpose(propagator.res[i_z0:i_zf, :2]),
+                xlabel='time ' + r"$ t \omega_0$", ylabel='',
+                legend=[r"$y(\tau)$", r"$\dot{y}(\tau)$"],
+                fname=logging.subdir + "/res_t_zoom.pdf")
+
+    # test
+    data = np.zeros([2, len( times[i_z0:i_zf])])
+    data[0] =- 1.65 * np.sin(times[i_z0:i_zf])
+    data[1] = propagator.res[i_z0:i_zf, 1]
+    plot_N_in_1(times[i_z0:i_zf], data,
+                xlabel='time ' + r"$ t \omega_0$", ylabel='',
+                legend=[r"$y(\tau)$", r"$\dot{y}(\tau)$"], 
+                linestyle=["--", "-."],
+                fname=logging.subdir + "/test.pdf")
+
+    # M_{xy}
+    plot_ReIm(times, Mxy,
+              xlabel='time ' + r"$ t \omega_0$", 
+              ylabel=r"$M_{xy}(\tau)$",
+              fname=logging.subdir + "/Mxy_ReIm.pdf")    
+    
+    # zoomed result of M_{xy}
     plot_ReIm(times[i_z0:i_zf], Mxy[i_z0:i_zf],
+              xlabel='time ' + r"$ t \omega_0$", 
+              ylabel=r"$M_{xy}(\tau)$",
               fname=logging.subdir + "/Mxy_zoom.pdf")
 
+    # M_{xy, rot}
     plot_ReIm(times, Mxy_rot,
-              fname=logging.subdir + "/Mxy_rot_ReIm.pdf")
+              xlabel='time ' + r"$ t \omega_0$", 
+              ylabel=r"$M_{xy}(\tau)$",
+              fname=logging.subdir + "/Mxy_rot_ReIm.pdf")  
 
-    plot_N_in_1(times, [Bcoil],
+    # zoomed M_{xy, rot}
+    plot_ReIm(times[i_z0:i_zf], Mxy_rot[i_z0:i_zf],
+              xlabel='time ' + r"$ t \omega_0$", 
+              ylabel=r"$M_{xy}(\tau)$",
+              fname=logging.subdir + "/Mxy_rot_zoom.pdf")         
+
+    # magnetic field Bx
+    plot_N_in_1(times, [circuit.r_eff * propagator.res[:, 5]],
+                xlabel='time ' + r"$ t \omega_0$", 
+                ylabel=r"B_x(t \omega) / \tilde{B} $",
                 fname=logging.subdir + "/Bcoil.pdf")
 
-    plot_N_in_1(wvec, [np.log10(np.abs(Bcoil_FT)**2)],
-                xlim=[-3.2, 6.2],
-                fname=logging.subdir + "/Bcoil_FT.pdf")
+
+    # zoom of current of the vco 
+    plot_N_in_1(times[i_z0:i_zf], [I_d[i_z0:i_zf]],
+                xlabel='time ' + r"$ t \omega_0$", ylabel='',
+                legend=[r"$i_d / I_{bias}(\tau)$"],
+                fname=logging.subdir + "/current_zoom.pdf")
+
     
 
-    # plots in Fourier space
+    # --- plots in Fourier space
+
+    # y(w)
     plot_N_in_1(wvec, [np.log10(np.abs(res_ft[:, 0])**2)],
             xlabel='frequency ' + r"$\omega / \omega_0$", ylabel='',
             legend=[r"$log_{10}\left[|y(\omega)|^2\right]$"],
@@ -178,51 +266,49 @@ for N_now in range(param_obj.N_runs):
             fname=logging.subdir + "/res_w.pdf",
             vline=[circuit.w0]) 
 
-    # plots in time space
+    # M_x(w)
+    plot_N_in_1(wvec, [np.log10(np.abs(res_ft[:,2])**2)],
+                xlim=[w_z0, w_zf],
+                xlabel='frequency ' + r"$\omega / \omega_0$", ylabel='',
+                legend=[r"$log_{10}\left[|M_x(\omega)|^2\right]$"],
+                linestyle = ["--", "-."],
+                vline=[circuit.w0], 
+                fname=logging.subdir + "/Mx_FT.pdf")
 
-    # full result
-    plot_N_in_1(times, np.transpose(propagator.res[:, :2]),
-                xlabel='time ' + r"$\tau =  t \omega_0$", ylabel='',
-                legend=[r"$y(\tau)$", r"$\dot{y}(\tau)$"],
-                fname=logging.subdir + "/res_t.pdf",
-                vline=[t_st])
+    wvec, Mx_rot_FT = fourier_transform(times[i_st:] - times[i_st], np.real(Mxy_rot)[i_st:])
 
-    # zoomed result
-    plot_N_in_1(times[i_z0:i_zf], np.transpose(propagator.res[i_z0:i_zf, :2]),
-                xlabel='time ' + r"$ t \omega_0$", ylabel='',
-                legend=[r"$y(\tau)$", r"$\dot{y}(\tau)$"],
-                fname=logging.subdir + "/res_t_zoom.pdf")
+
+    # M_x_rot(w)
+    plot_N_in_1(wvec, [np.log10(np.abs(Mx_rot_FT)**2)],
+                xlim=[-3.5, 3.5],
+                xlabel='frequency ' + r"$\omega / \omega_0$", ylabel='',
+                legend=[r"$log_{10}\left[|M_x(\omega)|^2\right]$"],
+                linestyle = ["--", "-."],
+                vline=[circuit.w0], 
+                fname=logging.subdir + "/Mx_rot_FT.pdf")
+
+    # Bcoil
+    plot_N_in_1(wvec, [np.log10(np.abs(circuit.r_eff**2 * res_ft[:,5])**2)],
+                xlabel='frequency ' + r"$\omega / \omega_0$", ylabel='',
+                legend=[r"$log_{10}\left[|B_{coil}(\omega)/\tilde{B}|^2\right]$"],
+                xlim=[-3.2, 6.2],
+                fname=logging.subdir + "/Bcoil_FT.pdf")
     
-    # result as complex variable in phase-space 
-    alpha =  propagator.res[:, 0] + 1.0j*propagator.res[:, 1]
-    alpha_rot = alpha  * np.exp(1.0j * w_osc * times)
-
-    # phase-space plot
-    plot_phasespace_classical([alpha_rot, alpha_rot[i_st:]],
-                              legend=["full evolution", "steady state"],
-                              fname=logging.subdir + "/res_phsp.pdf")
-
-
-    # current of the VCO
-    I_d = current_VCO(propagator.res[:, 0], circuit.n)
-
-    # FT of the current 
-    wvec, I_d_FT = fourier_transform(times[i_st:] - times[i_st], I_d[i_st:]) 
-
-    # full result
-    plot_N_in_1(times[i_z0:i_zf], [I_d[i_z0:i_zf]],
-                xlabel='time ' + r"$ t \omega_0$", ylabel='',
-                legend=[r"$i_d / I_{bias}(\tau)$"],
-                fname=logging.subdir + "/current_zoom.pdf")
-    
-    # plots in Fourier space
+    # current 
     plot_N_in_1(wvec, [np.log10(np.abs(I_d_FT)**2)],
             xlabel='frequency ' + r"$\omega / \omega_0$", ylabel='',
             legend=[r"$log_{10}\left[|i_d / I_{bias}(\omega)|^2\right]$"],
             xlim=[w_z0, w_zf],
             fname=logging.subdir + "/current_w.pdf",
             vline=[circuit.w0]) 
-    
+
+    # --- phase-space plots
+
+    plot_phasespace_classical([alpha_rot, alpha_rot[i_st:]],
+                              legend=["full evolution", "steady state"],
+                              fname=logging.subdir + "/res_phsp.pdf")
+
+
 
     # plot spin motion
     '''
@@ -234,11 +320,13 @@ for N_now in range(param_obj.N_runs):
                       sphere=True,
                       equal_axes=False)
 
+                      
     plot_phasespace_classical([Mxy_rot, Mxy_rot[i_st:]],
                             legend=["full evolution", "steady state"],
-                            xlabel=r"$M_{x,rot}(\tau)$", 
-                            ylabel=r"$M_{y,rot}(\tau)$",
-                            fname=logging.subdir + "/Mxy_rot.pdf")
+                            xlabel=r"$m_{x,rot}(\tau)$", 
+                            ylabel=r"$m_{y,rot}(\tau)$",
+                            fname=logging.subdir + "/Mxy_phsp.pdf")
+
     '''
 
 
