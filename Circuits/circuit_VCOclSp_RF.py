@@ -22,17 +22,14 @@ class Circuit_VCOclSp_RF:
         # RWA or not
         self.do_RWA = lookup_in_dict(params, "do_RWA", False) 
 
-        # sum cutoff for the approximation of the Bx-field
-        self.nMAX = lookup_in_dict(params, "nMAX", 0)
+        # if the simulation uses protons or electrons
+        self.simulate_protons = lookup_in_dict(params, "simulate_protons", 0)
 
         # VCO parameters
 
         # damping rate and quality factor:
         # Qcoil = w0/gamma_t = w0 L / R
         self.Qcoil = Qcoil
-
-
-        self.gamma_t = 1.0 / self.Qcoil
 
         # transistor slope
         self.n = n
@@ -48,21 +45,22 @@ class Circuit_VCOclSp_RF:
         # Larmor frequency, can not be zero due to normalization to M0
         self.wL = wL
 
+        self.Delta = self.Qcoil * (self.wL -1) 
+
         # spin relaxation times
-        self.T1 = T1
-        self.T2 = T2
+        self.T1 = T1 * self.Qcoil
+        self.T2 = T2 * self.Qcoil
 
         # couling constant between oscillator and spins
         self.K = K  
 
         # initial values 
         self.initial = np.array([
-            lookup_in_dict(params, "y0", 0.0),
-            lookup_in_dict(params, "y1", 0.0),
-            lookup_in_dict(params, "Mx", 0.0),
-            lookup_in_dict(params, "My", 0.0),
+            (lookup_in_dict(params, "y0", 0.0) -1.0j *  lookup_in_dict(params, "y1", 0.0))/2.0,
+            0.0 + 0.0j,
+            lookup_in_dict(params, "Mx", 0.0) + 1.0j * lookup_in_dict(params, "My", 0.0),
             lookup_in_dict(params, "Mz", 1.0),
-            0.0 # initial current is always zero
+            0.0 + 0.0j # initial B-field is always zero
         ])
 
         # voltage noise 
@@ -72,18 +70,6 @@ class Circuit_VCOclSp_RF:
         
         print("build rhs of system")
         self.rhs = self.build_rhs()
-
-
-    def get_B_function(self):
-
-        def B_function(t, y):
-
-            fac = - self.Qcoil /(2 * self.alpha_od) * self.r_eff 
-            res = 0
-
-            for nn in range(self.nMAX):
-
-                res += fac * (1.0j)**(nn+1)/self.Qcoil**nn * 
 
 
     def build_rhs(self):
@@ -96,31 +82,58 @@ class Circuit_VCOclSp_RF:
 
         i = 1.0j
 
-        T1tilde = Q * self.T1
-        T2tilde = Q * self.T2
+        pm = 1.0 if self.simulate_protons else -1.0
 
-        Delta = Q * (self.wL -1)        
 
         if self.do_RWA:
 
+            ### RWA
+            def rhs(t, y):
+
+                mxy_der = -y[2] * (1 / self.T2 + i * self.Delta ) + i * y[3] * Q * y[4]
+
+                aval = np.conjugate(y[0]) if self.simulate_protons else y[0]
+                mxy_val = np.conjugate(mxy_der) + i * Q * np.conjugate(y[2]) if self.simulate_protons else mxy_der + i * Q * y[2] 
+
+                # vco dof
+                res[0] = - 0.5 * y[0] * (1 - self.alpha_od + fac * np.abs(y[0])**2) + i * self.K * mxy_val / 4.0 * mxy_val
+
+                res[1] = 0
+
+                # spin dof 
+                res[2] = mxy_der
+
+                res[3] = (1-y[3])/self.T1 - Q * np.imag(y[2] * np.conjugate(y[4]))
+
+                # B-field
+                res[4] = pm * Q * (Q/(2 * self.alpha_od) * aval + i * y[4]) 
+
+                return res
+            
+        ### FULL EOMs
         else:
 
             def rhs(t, y):
+
+                mxy_der = -y[2] * (1 / self.T2 + i * self.Delta ) + i * y[3] * Q * y[4]
+
+                aval = np.conjugate(y[0]) if self.simulate_protons else y[0]
+                mxy_val = Q * np.conjugate(mxy_der) + i * Q**2 * np.conjugate(y[2]) if self.simulate_protons else Q* mxy_der + i * Q**2 * y[2] 
 
                 # vco dof
                 res[0] = y[1]
 
                 res[1] = -2 * i * Q * y[1] - (y[1] + i * y[0]) * (1 - self.alpha_od + fac * np.abs(y[0])**2) 
                 - fac * (y[0]**2 *np.conjugate(y[1]) + y[1] * np.abs(y[0])**2 + y[0]**2 * (y[1] + i * Q * y[0]) * np.exp(2*i*Q*t))
-
+                + self.K * mxy_val / 2.0
 
                 # spin dof 
-                res[2] = -y[2] * (1 / self.T2 + i * Delta ) + i * y[3] * Q * 
+                res[2] = mxy_der
 
-                res[3] = (1-y[3])/T1tilde - Q * np.imag(y[2] * )
+                res[3] = (1-y[3])/self.T1 - Q * np.imag(y[2] * np.conjugate(y[4]))
 
                 # B-field
-                res[4] = - self.Qcoil /(2 * self.alpha_od) * self.r_eff * (i * y[0] - y[1]/Q)
+                res[4] = pm * Q * (Q/(2 * self.alpha_od) * aval + i * y[4]) 
 
                 return res
 

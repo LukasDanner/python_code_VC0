@@ -56,7 +56,7 @@ class PropagatorClassical:
                                }
 
 
-    def allocate_results(self):
+    def allocate_results(self, COMPLEX=False):
         '''
         allocate memory-space for propagation results
 
@@ -70,8 +70,16 @@ class PropagatorClassical:
         # if we have not allocated a matrix yet
         if self.res is None or len(self.res) < LEN:
 
-            # allocate space for this matrix
-            self.res = np.empty([LEN, len(self.circuit.initial)])
+            if COMPLEX:
+
+
+                # allocate space for this matrix
+                self.res = np.empty([LEN, len(self.circuit.initial)], dtype=np.complex_)
+
+            else:
+
+                # allocate space for this matrix
+                self.res = np.empty([LEN, len(self.circuit.initial)])
 
     def print_progress(self, t_cur, tf):
         '''
@@ -83,7 +91,7 @@ class PropagatorClassical:
             print('     propagation is ' + '{:0.3f}'.format(100 * t_cur / tf) + '% completed')
 
 
-    def propagate_ode(self):
+    def propagate_ode(self, COMPLEX=False):
         '''
         - propagates an eom-system
         - stores the results in an array
@@ -93,7 +101,7 @@ class PropagatorClassical:
         '''
 
         # allocate solution matrix
-        self.allocate_results()
+        self.allocate_results(COMPLEX=COMPLEX)
 
         # get an integrator
         if self.integrator == "zvode":
@@ -169,6 +177,9 @@ class PropagatorClassical:
 
         stores all results in
         '''
+
+        COMPLEX = lookup_in_dict(params, "COMPLEX", False)
+
         # only search for steady-state
         if self.do_only_steady_state:
 
@@ -194,5 +205,5 @@ class PropagatorClassical:
                 else:
                     
                     print('propagating with integrator: ' + self.integrator)
-                    self.propagate_ode()
+                    self.propagate_ode(COMPLEX=COMPLEX)
 
