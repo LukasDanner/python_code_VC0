@@ -1,6 +1,6 @@
 import sys
 import numpy as np
-from scipy.integrate import ode, complex_ode
+from scipy.integrate import ode, complex_ode, solve_ivp
 from sdeint import itoEuler
 
 
@@ -42,8 +42,8 @@ class PropagatorClassical:
         self.method = method
 
         # absolute and relative integration tolerance
-        self.atol = atol
-        self.rtol = rtol
+        self.atol = float(atol)
+        self.rtol = float(rtol)
 
         # number of max. internal integration steps of the python-integrator
         self.nsteps = nsteps
@@ -65,7 +65,6 @@ class PropagatorClassical:
         '''
 
         LEN = int(len(self.times) / self.t_every) + 1 if self.t_every > 1 else len(self.times)
-
 
         # if we have not allocated a matrix yet
         if self.res is None or len(self.res) < LEN:
@@ -103,6 +102,23 @@ class PropagatorClassical:
         # allocate solution matrix
         self.allocate_results(COMPLEX=COMPLEX)
 
+        sol = solve_ivp(self.circuit.rhs, (self.times[0], self.times[-1]), self.circuit.initial, t_eval=self.times,
+                        #rtol=self.rtol, atol=self.atol,
+                        method=self.method
+                        )
+
+        self.res = sol.y.T
+
+        print('status report of solver: ')    
+        print(sol.success)
+        print(sol.message)
+        #print(sol.nfev)
+        #print(sol.njev)
+        #print(sol.nlu)
+        #print(sol.t[-1], self.times[-1])
+
+        '''
+
         # get an integrator
         if self.integrator == "zvode":
 
@@ -121,11 +137,13 @@ class PropagatorClassical:
                                                              nsteps=self.nsteps)
 
 
+
         # set initial conditions
         r.set_initial_value(self.circuit.initial, self.times[0])
 
         # store the initial conditions for the solutions
         self.res[0] = self.circuit.initial
+
 
         # set the counter for the current time step
         step = 1
@@ -147,8 +165,6 @@ class PropagatorClassical:
 
                 self.print_progress(self.times[step], self.times[-1])
 
-            #print(step, res)
-
             # increase time-step
             step += 1
 
@@ -156,6 +172,8 @@ class PropagatorClassical:
         if step < len(self.times):
 
             print('ATTENTION: propagation unsuccesful')
+
+        '''
 
     def propagate_noise(self):
 
@@ -204,6 +222,6 @@ class PropagatorClassical:
 
                 else:
                     
-                    print('propagating with integrator: ' + self.integrator)
+                    #print('propagating with integrator: ' + self.integrator)
                     self.propagate_ode(COMPLEX=COMPLEX)
 

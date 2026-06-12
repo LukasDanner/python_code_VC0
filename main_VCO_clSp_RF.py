@@ -101,7 +101,7 @@ for N_now in range(param_obj.N_runs):
 
     else:
         print("propagating ")
-        propagator.propagate()
+        propagator.propagate(COMPLEX=True)
 
         if param_obj.params_now_flat["store_sol"]:
 
@@ -142,6 +142,8 @@ for N_now in range(param_obj.N_runs):
     # main steady-state oscillation frequency
     w_osc = [wvec[i_osc]]
 
+    print("check", np.abs(propagator.res[-1, 0]), propagator.res[-1, 0] )
+
 
     # --- Plots in time space 
 
@@ -153,13 +155,14 @@ for N_now in range(param_obj.N_runs):
     plot_N_in_1(times, data,
                 xlabel='time ' + r"$\tau =  t \omega_0 / Q$", ylabel='',
                 legend=[r"$Re a(\tau)$",r"$Im a(\tau)$", r"$|a(\tau)|$"],
+                linestyle=["-", "-", "--"],
                 fname=logging.subdir + "/a_t.pdf",
                 vline=[t_st])
 
     # zoomed result of a
     plot_N_in_1(times[i_z0:i_zf], data[:, i_z0:i_zf],
                 xlabel='time ' + r"$ t \omega_0$", ylabel='',
-                legend=[r"$Re a'(\tau)$",r"$Im a'(\tau)$", r"$|a'(\tau)|$"],
+                legend=[r"$Re a(\tau)$",r"$Im a(\tau)$", r"$|a(\tau)|$"],
                 fname=logging.subdir + "/a_t_zoom.pdf")
     
     # full result of a'
@@ -175,30 +178,36 @@ for N_now in range(param_obj.N_runs):
 
     # zoomed result of a'
     plot_N_in_1(times[i_z0:i_zf], data[:, i_z0:i_zf],
-                xlabel='time ' + r"$ t \omega_0$", ylabel='',
+                xlabel='time ' + r"$\tau = t \omega_0 / Q$",
                 legend=[r"$Re a'(\tau)$",r"$Im a'(\tau)$", r"$|a'(\tau)|$"],
-                fname=logging.subdir + "/a_t_zoom.pdf")
+                fname=logging.subdir + "/adot_t_zoom.pdf")
 
     # M_{xy}
     plot_ReIm(times, Mxy,
-              xlabel='time ' + r"$ t \omega_0$", 
-              ylabel=r"$M_{xy}(\tau)$",
+              xlabel='time ' + r"$\tau = t \omega_0 / Q$",
+              ylabel=r"$m_{xy}(\tau)$",
               fname=logging.subdir + "/Mxy_ReIm.pdf")    
     
     # zoomed result of M_{xy}
     plot_ReIm(times[i_z0:i_zf], Mxy[i_z0:i_zf],
-              xlabel='time ' + r"$ t \omega_0$", 
-              ylabel=r"$M_{xy}(\tau)$",
+              xlabel='time ' + r"$\tau = t \omega_0 / Q$",
+              ylabel=r"$m_{xy}(\tau)$",
               fname=logging.subdir + "/Mxy_zoom.pdf")
         
 
-    # magnetic field Bx
+    # M_z
+    plot_N_in_1(times, [np.real(propagator.res[:, 3])],
+              xlabel='time ' + r"$\tau =  t \omega_0/Q$", 
+              ylabel=r"$m_{z}(\tau)$",
+              fname=logging.subdir + "/Mz_t.pdf")    
+    
+    # magnetic field Bxy
     data = np.zeros([3, len(times)])
     data[0] = np.real(propagator.res[:, 4])
     data[1] = np.imag(propagator.res[:, 4])
     data[2] = np.abs(propagator.res[:, 4])    
     plot_N_in_1(times, data,
-                xlabel='time ' + r"$ t \omega_0 / Q$", 
+                xlabel='time ' + r"$\tau = t \omega_0 / Q$",
                 legend=[r"$Re B_{xy}$",r"$Im B_{xy}$", r"$|B_{xy}|$"],
                 fname=logging.subdir + "/Bxy_t.pdf")
     
@@ -207,7 +216,7 @@ for N_now in range(param_obj.N_runs):
 
     # a(w)
     plot_N_in_1(wvec, [np.log10(np.abs(res_ft[:, 0])**2)],
-            xlabel='frequency ' + r"$\omega / \omega_0$", ylabel='',
+            xlabel='frequency ' + r"$Q \omega / \omega_0$",
             legend=[r"$log_{10}\left[|a(\omega)|^2\right]$"],
             xlim=[w_z0, w_zf],
             fname=logging.subdir + "/a_FT.pdf",
@@ -216,7 +225,7 @@ for N_now in range(param_obj.N_runs):
     # M_xy(w)
     plot_N_in_1(wvec, [np.log10(np.abs(res_ft[:,2])**2)],
                 xlim=[w_z0, w_zf],
-                xlabel='frequency ' + r"$\omega / \omega_0$", ylabel='',
+                xlabel='frequency ' + r"$Q \omega / \omega_0$", ylabel='',
                 legend=[r"$log_{10}\left[|M_x(\omega)|^2\right]$"],
                 linestyle = ["--", "-."],
                 vline=[0.0], 
@@ -224,9 +233,10 @@ for N_now in range(param_obj.N_runs):
 
     # Bxy
     plot_N_in_1(wvec, [np.log10(np.abs(res_ft[:,4])**2)],
-                xlabel='frequency ' + r"$\omega / \omega_0$", ylabel='',
+                xlabel='frequency ' + r"$Q \omega / \omega_0$", ylabel='',
                 legend=[r"$log_{10}\left[|B_{xy}(\omega)/\tilde{B}|^2\right]$"],
                 xlim=[-3.2, 6.2],
+                vline=[0.0], 
                 fname=logging.subdir + "/Bxy_FT.pdf")
     
 

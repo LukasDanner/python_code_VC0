@@ -81,7 +81,7 @@ class Circuit_VCOclSp:
 
             # vco dof
             res[0] = y[1]
-            res[1] = - y[0]  - (1.0/self.Qcoil) * ((1 - self.alpha_od) + 3 * self.alpha_od /(8 * self.n) * y[0]**2) * y[1] - self.K * y[2]
+            res[1] = - y[0]  - (1.0/self.Qcoil) * ((1 - self.alpha_od) + 3 * self.alpha_od /(8 * self.n**2) * y[0]**2) * y[1] - self.K * y[2]
 
             # spin dof 
             res[2] = - y[2] / self.T2 + self.wL * y[3]

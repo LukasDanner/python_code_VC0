@@ -23,7 +23,7 @@ class Circuit_VCOclSp_RF:
         self.do_RWA = lookup_in_dict(params, "do_RWA", False) 
 
         # if the simulation uses protons or electrons
-        self.simulate_protons = lookup_in_dict(params, "simulate_protons", 0)
+        self.simulate_protons = lookup_in_dict(params, "simulate_protons", True)
 
         # VCO parameters
 
@@ -48,8 +48,8 @@ class Circuit_VCOclSp_RF:
         self.Delta = self.Qcoil * (self.wL -1) 
 
         # spin relaxation times
-        self.T1 = T1 * self.Qcoil
-        self.T2 = T2 * self.Qcoil
+        self.T1 = T1 / self.Qcoil
+        self.T2 = T2 / self.Qcoil
 
         # couling constant between oscillator and spins
         self.K = K  
@@ -68,13 +68,21 @@ class Circuit_VCOclSp_RF:
 
         self.include_noise = True if self.Vn != 0.0 else False
         
+        stroboscopic_times = lookup_in_dict(params, "stroboscopic_times", False)
+
+        self.tf = lookup_in_dict(params, "tf", 0.0) * (2 * np.pi if stroboscopic_times else 1.0)
+
         print("build rhs of system")
         self.rhs = self.build_rhs()
 
 
     def build_rhs(self):
 
-        res = np.zeros(len(self.initial))
+        global counter 
+        counter = 0
+
+
+        res = np.zeros(len(self.initial), dtype=np.complex_)
 
         Q = self.Qcoil
 
@@ -84,29 +92,43 @@ class Circuit_VCOclSp_RF:
 
         pm = 1.0 if self.simulate_protons else -1.0
 
+        Bval = 1 + 0.5j
+        denom = 1 + (self.Delta * self.T2)**2 + self.T1 * self.T2 * Q**2 * np.abs(Bval)**2
+        chi1 = self.T2 * Q * self.Delta * self.T2 / denom 
+        chi2 = self.T2 * Q / denom 
+        print("debug", denom, chi1, chi2, (chi1 + i * chi2) * pm * Bval) 
 
         if self.do_RWA:
 
             ### RWA
             def rhs(t, y):
 
-                mxy_der = -y[2] * (1 / self.T2 + i * self.Delta ) + i * y[3] * Q * y[4]
+                global counter 
+                counter += 1
+                if counter % 100000 == 0:
+                    print( f"progress = {100 * t/self.tf:.4f}%",  f"rhs calls = {counter}")
+
+                B_amp = Bval # y[4]
+
+
+                mxy_der = -y[2] * (1 / self.T2 + i * self.Delta ) + pm * i * y[3] * Q * B_amp
 
                 aval = np.conjugate(y[0]) if self.simulate_protons else y[0]
                 mxy_val = np.conjugate(mxy_der) + i * Q * np.conjugate(y[2]) if self.simulate_protons else mxy_der + i * Q * y[2] 
 
-                # vco dof
-                res[0] = - 0.5 * y[0] * (1 - self.alpha_od + fac * np.abs(y[0])**2) + i * self.K * mxy_val / 4.0 * mxy_val
+                mxy_val = (chi1 + i * chi2) * pm * Bval
 
+                # vco dof
+                res[0] = - y[0]/2 * (1 - self.alpha_od + fac * np.abs(y[0])**2) + self.K * mxy_val * Q / 2.0 / (2 * i * Q)
                 res[1] = 0
 
                 # spin dof 
                 res[2] = mxy_der
 
-                res[3] = (1-y[3])/self.T1 - Q * np.imag(y[2] * np.conjugate(y[4]))
+                res[3] = (1-y[3])/self.T1 - pm *  Q * np.imag(y[2] * np.conjugate(B_amp))
 
-                # B-field
-                res[4] = pm * Q * (Q/(2 * self.alpha_od) * aval + i * y[4]) 
+                # Bxy-field
+                res[4] = pm * Q * (Q *self.r_eff/(2 * self.alpha_od) * aval + i * y[4]) 
 
                 return res
             
@@ -115,25 +137,33 @@ class Circuit_VCOclSp_RF:
 
             def rhs(t, y):
 
-                mxy_der = -y[2] * (1 / self.T2 + i * self.Delta ) + i * y[3] * Q * y[4]
+                global counter 
+                counter += 1
+                if counter % 100000 == 0:
+                    print( f"progress = {100 * t/self.tf:.4f}%",  f"rhs calls = {counter}")
+
+                B_amp =  y[4]
+
+                mxy_der = -y[2] * (1 / self.T2 + i * self.Delta ) + pm * i * y[3] * Q * B_amp 
 
                 aval = np.conjugate(y[0]) if self.simulate_protons else y[0]
-                mxy_val = Q * np.conjugate(mxy_der) + i * Q**2 * np.conjugate(y[2]) if self.simulate_protons else Q* mxy_der + i * Q**2 * y[2] 
+                mxy_val = np.conjugate(mxy_der) + i * Q * np.conjugate(y[2]) if self.simulate_protons else mxy_der + i * Q * y[2] 
 
                 # vco dof
                 res[0] = y[1]
 
-                res[1] = -2 * i * Q * y[1] - (y[1] + i * y[0]) * (1 - self.alpha_od + fac * np.abs(y[0])**2) 
-                - fac * (y[0]**2 *np.conjugate(y[1]) + y[1] * np.abs(y[0])**2 + y[0]**2 * (y[1] + i * Q * y[0]) * np.exp(2*i*Q*t))
-                + self.K * mxy_val / 2.0
+                res[1] = -2 * i * Q * y[1] - (y[1] + i * Q * y[0]) * (1 - self.alpha_od + fac * np.abs(y[0])**2) 
+                - fac * y[0]**2 * (y[1] + np.conjugate(y[1])  + (y[1] + i * Q * y[0]) * np.exp(2*i*Q*t))
+                + self.K * mxy_val * Q / 2.0
+
 
                 # spin dof 
                 res[2] = mxy_der
 
-                res[3] = (1-y[3])/self.T1 - Q * np.imag(y[2] * np.conjugate(y[4]))
+                res[3] = (1-y[3])/self.T1 - pm * Q * np.imag(y[2] * np.conjugate(B_amp))
 
                 # B-field
-                res[4] = pm * Q * (Q/(2 * self.alpha_od) * aval + i * y[4]) 
+                res[4] = pm * Q * (Q * self.r_eff/(2 * self.alpha_od) * aval + i * y[4]) 
 
                 return res
 

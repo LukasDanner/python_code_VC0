@@ -125,6 +125,10 @@ for N_now in range(param_obj.N_runs):
     # oscillation amplitude: mean of all peaks
     A_osc = np.mean((propagator.res[i_st:,0])[peak_indices_y])
 
+    check = 0.5 * (propagator.res[:, 0] - 1.0j * propagator.res[:,1]) * np.exp(-1.0j * times)
+
+    print("check", np.mean(check[i_st]))
+
 
     # --- Fourier transform of steady state
     #res_ft = np.empty_like(propagator.res[i_st:, :])
